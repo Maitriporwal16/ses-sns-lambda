@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Template creates SES and SNS resouces
+
+Parameters:
+  env:
+    Type: String
+    Description: Which environment do you want to deploy to? (dev,stage, or prod)
+    Default: dev
+    AllowedValues:
+      - dev
+      - stage
+      - prod
+
+  EventType:
+    Type: String
+    Default: Send
+    AllowedValues:
+      - Send
+      - Open
+      - Click
+      - Delivery
+  
+  MySNSTopic:
+    Type: String
+
+Resources:
+  emailTrackerLambda:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      Environment: {Variables: {LOG_GROUP_NAME: !Ref CloudWatchLogsGroup, Event_type: !Ref EventType, LOG_LEVEL: 'INFO'}}
+      Code:
+        ZipFile: |
+          exports.handler = async (event) => {
+            console.log(`EVENT: ${JSON.stringify(event)}`);
+            return {
+                statusCode: 200,
+            //  Uncomment below to enable CORS requests
+            //  headers: {
+            //      "Access-Control-Allow-Origin": "*",
+            //      "Access-Control-Allow-Headers": "*"
+            //  }, 
+                body: JSON.stringify('Hello from Lambda!'),
+            };
+            };
+      FunctionName: !Sub 'emailTrackerTest-${env}'
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: nodejs14.x
+      Timeout: 10
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Action:
+              - 'sts:AssumeRole'
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Sid: ''
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - 
+          PolicyName: CWLogsPermissions
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                  - "logs:DescribeLogStreams"
+                Resource: "arn:aws:logs:*:*:*"
+                Effect: "Allow"
+        
+  LambdaFunctionPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref emailTrackerLambda
+      Action: lambda:InvokeFunction
+      Principal: sns.amazonaws.com
+      SourceArn: !Ref MySNSTopic
+
+# SNS TOPIC
+  # MySNSTopic:
+  #   Type: AWS::SNS::Topic
+  #   Properties:
+  #     TopicName: !Sub 'Sns-emailTracker-${env}'
+  # SnsSubscription:
+  #   Type: 'AWS::SNS::Subscription'
+  #   Properties:
+  #     TopicArn: !Ref MySNSTopic
+  #     Endpoint: !GetAtt 
+  #       - emailTrackerLambda
+  #       - Arn
+  #     Protocol: lambda
+
+#MyTopicSubscription
+  SnsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+        Protocol: lambda
+        Endpoint: !GetAtt emailTrackerLambda.Arn
+        TopicArn: !Ref MySNSTopic
+
+  ConfigurationSet:
+    Type: 'AWS::SES::ConfigurationSet'
+    Properties:
+      Name: !Sub 'emailTrackerTest-ConfigSetTest-${env}'
+      TrackingOptions:
+        CustomRedirectDomain: 'bazarhealth.com'
+      SendingOptions:
+        SendingEnabled: true
+
+  EventDestination:
+    Type: 'AWS::SES::ConfigurationSetEventDestination'
+    Properties:
+      ConfigurationSetName: !Ref ConfigurationSet
+      EventDestination:
+        Name: !Sub 'SNS-Destination-${env}'
+        Enabled: true
+        MatchingEventTypes:
+          - 'send'
+          - 'delivery'
+          - 'open'
+          - 'click'
+        SnsDestination:
+          TopicARN: !Ref MySNSTopic
+
+  CloudWatchLogsGroup:
+    Type: 'AWS::Logs::LogGroup'
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/emailTrackerTest-${env}'
+      RetentionInDays: 30
+
+Outputs:
+  Topicrn:
+    Value: !Ref MySNSTopic
+
