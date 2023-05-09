@@ -20,8 +20,12 @@ Parameters:
       - Click
       - Delivery
   
-  MySNSTopic:
-    Type: String
+  # EmailIdentityName:
+  #   Type: String
+  #   Default: 'bazarhealth.com'
+
+  # MySNSTopic:
+  #   Type: String
 
 Resources:
   emailTrackerLambda:
@@ -42,11 +46,11 @@ Resources:
                 body: JSON.stringify('Hello from Lambda!'),
             };
             };
-      FunctionName: !Sub 'emailTrackerTest-${env}'
+      FunctionName: !Sub 'emailTrackerDemo-${env}'
       Handler: index.handler
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: nodejs14.x
-      Timeout: 10
+      Timeout: 10  
 
   LambdaExecutionRole:
     Type: 'AWS::IAM::Role'
@@ -86,19 +90,34 @@ Resources:
       Principal: sns.amazonaws.com
       SourceArn: !Ref MySNSTopic
 
-# SNS TOPIC
-  # MySNSTopic:
-  #   Type: AWS::SNS::Topic
-  #   Properties:
-  #     TopicName: !Sub 'Sns-emailTracker-${env}'
-  # SnsSubscription:
-  #   Type: 'AWS::SNS::Subscription'
-  #   Properties:
-  #     TopicArn: !Ref MySNSTopic
-  #     Endpoint: !GetAtt 
-  #       - emailTrackerLambda
-  #       - Arn
-  #     Protocol: lambda
+  SESSNSPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17'
+        Id: 'SES-Events-Policy'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref MySNSTopic
+            Condition:
+              StringEquals:
+                AWS:SourceAccount: !Ref AWS::AccountId
+                AWS:SourceArn: !Sub 'arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/{bazarhealth.com}'
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sns:Subscribe
+            Resource: !Ref MySNSTopic
+      Topics:
+        - !Ref MySNSTopic
+
+  MySNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub 'Sns-emailTrackerDemo-${env}'
 
 #MyTopicSubscription
   SnsSubscription:
@@ -111,18 +130,25 @@ Resources:
   ConfigurationSet:
     Type: 'AWS::SES::ConfigurationSet'
     Properties:
-      Name: !Sub 'emailTrackerTest-ConfigSetTest-${env}'
+      Name: !Sub 'emailTrackerTest-ConfigSetDemo-${env}'
       TrackingOptions:
         CustomRedirectDomain: 'bazarhealth.com'
       SendingOptions:
         SendingEnabled: true
+  
+  # MyEmailIdentity:
+  #   Type: AWS::SES::EmailIdentity
+  #   Properties:
+  #     EmailIdentity: !Ref EmailIdentityName
+  #     ConfigurationSetAttributes:
+  #       ConfigurationSetName: !Ref ConfigurationSet
 
   EventDestination:
     Type: 'AWS::SES::ConfigurationSetEventDestination'
     Properties:
       ConfigurationSetName: !Ref ConfigurationSet
       EventDestination:
-        Name: !Sub 'SNS-Destination-${env}'
+        Name: !Sub 'SNS-DestinationDemo-${env}'
         Enabled: true
         MatchingEventTypes:
           - 'send'
@@ -135,7 +161,7 @@ Resources:
   CloudWatchLogsGroup:
     Type: 'AWS::Logs::LogGroup'
     Properties:
-      LogGroupName: !Sub '/aws/lambda/emailTrackerTest-${env}'
+      LogGroupName: !Sub '/aws/lambda/emailTrackerDemo-${env}'
       RetentionInDays: 30
 
 Outputs:
