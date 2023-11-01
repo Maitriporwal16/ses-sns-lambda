@@ -1,3 +1,4 @@
+#this is just random commands
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Template creates SES and SNS resouces
 
