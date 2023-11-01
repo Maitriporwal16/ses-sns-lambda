@@ -1,0 +1,9 @@
+diff --git a/SES_Template.yml b/SES_Template.yml
+index 4131799..0ef87ca 100644
+--- a/SES_Template.yml
++++ b/SES_Template.yml
+@@ -1,3 +1,4 @@
++#this is just random commands
+ AWSTemplateFormatVersion: '2010-09-09'
+ Description: Template creates SES and SNS resouces
+ 

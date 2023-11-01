@@ -1,4 +1,4 @@
-#this is just random commands
+#this is just random command I am adding
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Template creates SES and SNS resouces
 
